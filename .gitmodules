@@ -1,0 +1,3 @@
+[submodule "ch32fun"]
+	path = ch32fun
+	url = git@github.com:hrandib/ch32fun.git
