@@ -6,11 +6,13 @@ This mode would be used, for example, to drive a motor with a H-bridge.
 
 This program shows the effect of changing the PWM deadtime settings with complementary outputs.
 
+Adapted to the CH32V003J4M6 pinout
+
 ## Use
 
 This uses the following pins (using AFIO remapping):
 
-| Pin | Function |
-| --- | --- |
-| PC6 | T1CH1 PWM output |
-| PC3 | T1CH1_N complementary PWM output |
+| Pin | Function                         |
+| --- | -------------------------------- |
+| PA1 | T1CH2 PWM output                 |
+| PA2 | T1CH2_N complementary PWM output |

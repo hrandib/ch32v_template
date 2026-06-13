@@ -1,9 +1,3 @@
-/*
- * Example for using Advanced Control Timer (TIM1) for PWM generation
- * with complementary outputs. Varies deadtime setting repeatedly.
- * 1 December 2024 Ned Konz
- */
-
 #include "ch32fun.h"
 #include <stdio.h>
 
@@ -37,92 +31,85 @@
         CH4 PD2
 */
 
-#define TIM1_PERIOD 10000 // 10000/4.8MHz = 2.083ms
-#define TIM1_DUTY_CYCLE 5000 // 50% duty cycle
+#define TIM1_PERIOD     6800              // 6800/480kHz = 14ms
+#define TIM1_DUTY_CYCLE (TIM1_PERIOD / 2) // 50% duty cycle
 
 /*
  * initialize TIM1 for PWM
  */
-void t1pwm_init( void )
+static void init_t1(void)
 {
-	// Enable GPIOC, TIM1, and AFIO clocks
-	RCC->APB2PCENR |= RCC_APB2Periph_GPIOC | RCC_APB2Periph_TIM1 | RCC_APB2Periph_AFIO;
+    // Enable GPIOC, TIM1, and AFIO clocks
+    RCC->APB2PCENR |= RCC_APB2Periph_GPIOA | RCC_APB2Periph_TIM1 | RCC_APB2Periph_AFIO;
 
-	// Re-map AFIO to allow PC3=TIM1_CH1N and PC6=TIM1_CH1 to be used
-	AFIO->PCFR1 &= ~AFIO_PCFR1_TIM1_REMAP_FULLREMAP;
-	AFIO->PCFR1 |= AFIO_PCFR1_TIM1_REMAP_PARTIALREMAP1;
+    AFIO->PCFR1 &= ~AFIO_PCFR1_PA12_REMAP;
 
-	// PC3 is T1CH1_N, 10MHz Output alt func, push-pull
-	funPinMode( PC3, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF );
+    // PA1 is T1CH2, 10MHz Output alt func, open-drain
+    funPinMode(PA1, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF);
 
-	// PC6 is T1CH1, 10MHz Output alt func, push-pull
-	funPinMode( PC6, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF );
+    // PA2 is T1CH2_N, 10MHz Output alt func, open-drain
+    funPinMode(PA2, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP_AF);
 
-	// Reset TIM1 to init all regs
-	RCC->APB2PRSTR |= RCC_APB2Periph_TIM1;
-	RCC->APB2PRSTR &= ~RCC_APB2Periph_TIM1;
+    // Reset TIM1 to init all regs
+    RCC->APB2PRSTR |= RCC_APB2Periph_TIM1;
+    RCC->APB2PRSTR &= ~RCC_APB2Periph_TIM1;
 
-	// CTLR1: default is up, events generated, edge align
-	TIM1->CTLR1 = 0;
+    // CTLR1: default is up, events generated, edge align
+    TIM1->CTLR1 = 0;
 
-	// CTLR2: set output idle states (MOE off) via OIS1 and OIS1N bits
-	TIM1->CTLR2 = 0;
+    // CTLR2: set output idle states (MOE off) via OIS2 and OIS2N bits
+    TIM1->CTLR2 = 0;
 
-	// SMCFGR: default clk input is 48MHz CK_INT
+    // SMCFGR: default clk input is 48MHz CK_INT
 
-	// Prescaler: divide by 10 => 4.8MHz
-	TIM1->PSC = 0x0009;
+    // Prescaler: divide by 100 => 480kHz
+    TIM1->PSC = 0x0065;
 
-	// Auto Reload - sets period = 10000/4.8MHz = 2.083ms
-	TIM1->ATRLR = TIM1_PERIOD;
+    // Auto Reload - sets period = 6800/480kHz = 14ms
+    TIM1->ATRLR = TIM1_PERIOD;
 
-	// Reload immediately
-	TIM1->SWEVGR |= TIM_UG;
+    // Reload immediately
+    TIM1->SWEVGR |= TIM_UG;
 
-	// Enable CH1 output, positive polarity
-	TIM1->CCER |= TIM_CC1E | TIM_CC1P;
+    // Enable CH2 output, positive polarity
+    TIM1->CCER |= TIM_CC2E | TIM_CC2P;
 
-	// Enable CH1N output, positive polarity
-	TIM1->CCER |= TIM_CC1NE | TIM_CC1NP;
+    // Enable CH2N output, positive polarity
+    TIM1->CCER |= TIM_CC2NE | TIM_CC2NP;
 
-	// CH1 Mode is output, PWM1 (CC1S = 00, OC1M = 110)
-	TIM1->CHCTLR1 |= TIM_OC1M_2 | TIM_OC1M_1;
+    // CH2 Mode is output, PWM1 (CC1S = 00, OC1M = 110)
+    TIM1->CHCTLR1 |= TIM_OC2M_2 | TIM_OC2M_1;
 
-	// Set the Capture Compare Register value to 50% initially
-	TIM1->CH1CVR = TIM1_DUTY_CYCLE;
+    // Set the Capture Compare Register value to 50% initially
+    TIM1->CH2CVR = TIM1_DUTY_CYCLE;
 
-	// Enable TIM1 outputs (also see OSSI and OSSR bits)
-	TIM1->BDTR |= TIM_MOE;
+    // Enable TIM1 outputs (also see OSSI and OSSR bits)
+    TIM1->BDTR |= TIM_MOE;
 
-	// Enable TIM1
-	TIM1->CTLR1 |= TIM_CEN;
+    // Enable TIM1
+    TIM1->CTLR1 |= TIM_CEN;
 }
 
 // low 5 bits are deadtime, upper 3 bits are deadtime prescaler and offset
-void t1pwm_set_deadtime( uint16_t deadtime )
+void t1pwm_set_deadtime(uint16_t deadtime)
 {
-	TIM1->BDTR = ( TIM1->BDTR & ~TIM_DTG ) | ( deadtime & TIM_DTG );
+    TIM1->BDTR = (TIM1->BDTR & ~TIM_DTG) | (deadtime & TIM_DTG);
 }
 
-/*
- * entry
- */
 int main()
 {
-	uint32_t count = 0;
+    uint32_t count = 0;
 
-	SystemInit();
-	Delay_Ms( 100 );
+    SystemInit();
+    Delay_Ms(100);
 
-	// init TIM1 for PWM
-	t1pwm_init();
+    init_t1();
 
-	// Repeat changing deadtime every 20ms
-	for ( ;; )
-	{
-		t1pwm_set_deadtime( count );
-		count++;
-		count &= 255;
-		Delay_Ms( 20 );
-	}
+    // Repeat changing deadtime every 20ms
+    for(;;) {
+        t1pwm_set_deadtime(count);
+        count++;
+        count &= 255;
+        Delay_Ms(20);
+    }
 }
